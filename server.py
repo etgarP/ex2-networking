@@ -72,6 +72,14 @@ def getClosedMessage():
             the closed message needed return
     """
 
+def getNotExistMessage():
+    """
+        input: 
+            nothing
+        output:
+            the not exist message
+    """
+
 def isClosed(lines):
     """
         input: 
@@ -88,6 +96,9 @@ while True:
             data = getAllData(conn)	
             path, lines = parseRequest()
             exists, path = pathExists(path)
+            if not exists:
+                message = getNotExistMessage()
+                conn.send(message) 
             message = getMessage(path, lines)
             conn.send(message) 
             if isClosed(lines):
