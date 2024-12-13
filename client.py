@@ -29,7 +29,6 @@ def main():
 		create_the_file(fileContent,fileName)
 
 
-
 def get_file_name(filePath):
 	return os.path.basename(filePath)
 
@@ -46,7 +45,7 @@ def get_all_data(con):
         if not newData: 
             break
         data += newData
-    return data.decode("utf-8")
+    return data
 
 def get_content(data):
 	delimiter = b"\r\n\r\n"
@@ -55,15 +54,18 @@ def get_content(data):
 	return data[index + len(delimiter):]
     
 def create_the_file(fileContent, fileName):
-	if fileName.endwith(('.ico', '.jpg')):
-		fileContent = fileContent.encode('utf-8')
 	# Getting the directory that this file is in
 	current_directory = os.path.dirname(os.path.abspath(__file__))
 	# Creating the path to the new file
 	file_path = os.path.join(current_directory, fileName)
-	# Writing the content to the file
-	with open(file_path, "w") as file:
-	    file.write(fileContent)
+	# If the file is an image, write in bytes
+	if fileName.endswith(('.ico', '.jpg')):
+		with open(file_path, "wb") as file:
+			file.write(fileContent)
+	else:	
+	    # Writing the content to the file
+	    with open(file_path, "w") as file:
+	        file.write(fileContent.decode('utf-8'))
 
 
 if __name__ == "__main__":
