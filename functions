@@ -1,0 +1,22 @@
+def parseRequest(data):
+    """
+        input: 
+            data
+        output:
+            path, lines in a map in format (name: value)
+    """
+	# separating the data into lines
+	lines = data.splitlines()
+
+	# First line is the GET request. the path is in the middle
+	request_line = lines[0]
+	_, path, _ = request_line.split(" ")
+	headers = lines[1:]
+
+	headers_dict = {}
+	for header in headers:
+		if header:
+			key, value = header.split(":", 1)
+			headers_dict[key.strip()] = value.strip()
+	
+	return path, headers_dict
