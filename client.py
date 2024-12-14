@@ -23,11 +23,19 @@ def main():
 		s.send(request.encode('utf-8'))
 		# Getting data from the server
 		serverReply = get_all_data(s)
-		fileContent = get_content(serverReply)
 
-		# Create file and fill it
-		create_the_file(fileContent,fileName)
+		# Getting the first line
+		firstLine = get_first_line(serverReply)
+		print(firstLine)
 
+		statusCode = firstLine.split(" ")[1]
+		if statusCode == "200":
+			handle_200(serverReply,fileName)
+		if statusCode == "404":
+			continue
+		if statusCode == "301":
+			# TO DO: EXTRACT LOCATION FROM SERVER
+			# SEND NEW REQUEST
 
 def get_file_name(filePath):
 	return os.path.basename(filePath)
@@ -66,6 +74,18 @@ def create_the_file(fileContent, fileName):
 	    # Writing the content to the file
 	    with open(file_path, "w") as file:
 	        file.write(fileContent.decode('utf-8'))
+
+def get_first_line(serverReply):
+    lines = serverReply.splitlines()
+    if isinstance(serverReply, bytes):
+        return lines[0].decode('utf-8')
+    else:
+        return lines[0]
+
+def handle_200(serverReply, fileName):
+	fileContent = get_content(serverReply)
+	# Create file and fill it
+	create_the_file(fileContent,fileName)
 
 
 if __name__ == "__main__":
