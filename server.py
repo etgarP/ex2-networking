@@ -56,6 +56,14 @@ def pathExists(relative_path):
         return True, relative_path
     return False, None
 
+def getMessageRequest():
+    """
+        input: 
+            None
+        output:
+            message
+    """
+
 def getMessage(path, lines):
     """
         input: 
@@ -63,6 +71,7 @@ def getMessage(path, lines):
         output:
             needed message to send to client
     """
+    
 
 def getClosedMessage():
     """
@@ -97,9 +106,12 @@ while True:
             path, lines = parseRequest()
             exists, path = pathExists(path)
             if not exists:
-                message = getNotExistMessage()
-                conn.send(message) 
-            message = getMessage(path, lines)
+                if path == "/redirect":
+                    message = getMessageRequest()
+                else:
+                    message = getNotExistMessage()
+            else:
+                message = getMessage(path, lines)
             conn.send(message) 
             if isClosed(lines):
                 conn.close()
