@@ -1,12 +1,6 @@
 import os 
 import sys 
 import socket
-TCP_IP = '0.0.0.0'
-TCP_PORT = int(sys.argv[1])
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind((TCP_IP, TCP_PORT))
-BUFFER_SIZE = 1024
-s.listen(1)
 
 def get_all_data(con):
     """
@@ -16,13 +10,8 @@ def get_all_data(con):
             all the data in a variable
     """
     data = ""
-    while True:
-        new_data = con.recv(BUFFER_SIZE)
-        if not new_data: 
-            break
-        new_data = new_data.decode()
-        data += new_data
-    return data
+    data = con.recv(BUFFER_SIZE)
+    return data.decode()
 
 def parse_request(data):
     """
@@ -53,20 +42,22 @@ def path_exists(relative_path):
         input: 
             relative path
         output:
-            if relative path is null or doesnt exists returns false 
+            if relative path is null or doesn't exist returns false 
                 else return true
     """
-    if (not relative_path):
+    if not relative_path:
         return False, None
-    elif (relative_path[0] == '/'):
-        relative_path = "files" + relative_path
-    else:
-        relative_path = "files/" + relative_path
+
+    # Normalize relative path
+    base_path = os.path.join(os.path.dirname(__file__), "files")
+    relative_path = os.path.join(base_path, relative_path.lstrip('/'))
+
+    # Check if path exists
     if os.path.exists(relative_path):
         return True, relative_path
-    return False, None    
+    return False, None
 
-def get_message(full_path, is_ico_jpg, connection_status):
+def get_message(full_path, is_ico_jpg, closed):
     """
         input: 
             path, is_ico_jpg, closed
@@ -75,6 +66,10 @@ def get_message(full_path, is_ico_jpg, connection_status):
     """
     try:
         # Open in binary mode for `.jpg` or `.ico`, text mode otherwise
+        if closed:
+            connection_status = "closed"
+        else:
+            connection_status = "keep alive"
         mode = "rb" if is_ico_jpg else "r"
         with open(full_path, mode) as f:
             content = f.read()
@@ -82,16 +77,12 @@ def get_message(full_path, is_ico_jpg, connection_status):
             message += f"Connection: {connection_status}\r\n"
             message += f"Content-Length: {len(content)}\r\n"
             message += "\r\n"
-            
-            # Return response for binary files
-            if is_ico_jpg:
-                return message.encode() + content
-            
-            # Return response for text files
-            return message + content
+            if (mode == "r"):
+                content = content.encode()
+            return message.encode() + content
     except Exception as e:
+        print(e)
         return get_not_exist_message()
-
 
 def get_redirect_message():
     """
@@ -102,6 +93,7 @@ def get_redirect_message():
     """
     message = "HTTP/1.1 301 Moved Permanently\r\n"
     message += "Connection: close\r\n"
+    message += "Location: /result.html\r\n"
     message += "\r\n"
     return message.encode()
 
@@ -126,20 +118,19 @@ def is_closed(lines):
     """
     return lines.get("connection", "").lower() == "close"
 
-def get_index_message(lines):
-    """
-        input: 
-            None
-        output:
-            Index message
-    """
-    message = "HTTP/1.1 301 Moved Permanently"
-    message += "Connection: close\r\n"
-    message += "Location: /result.html\r\n"
-    message += "\r\n"
-    return message.encode()
-
-    
+TCP_IP = '0.0.0.0'
+try:
+    # TCP_PORT = int(sys.argv[1])
+    TCP_PORT = 12342
+    if TCP_PORT < 1024 or TCP_PORT > 65535:
+        raise ValueError("Port must be between 1024 and 65535")
+except ValueError as e:
+    print(f"Invalid port: {e}")
+    sys.exit(1)
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind((TCP_IP, TCP_PORT))
+BUFFER_SIZE = 1024
+s.listen(1)
 
 while True:
     conn, addr = s.accept()
@@ -147,15 +138,16 @@ while True:
     try:
         while True:
             data = get_all_data(conn)	
-            if not data:
+            # print(data)
+            if not data or len(data.strip()) == 0:
                 conn.close()
                 break
             path, lines, is_ico_jpg = parse_request(data)
+            print("path:", path)
             closed = is_closed(lines)
             if path == "/":
-                message = get_index_message(closed)
-                path = "index.html"
-            if message == '/redirect':
+                path = "/index.html"
+            if path == '/redirect':
                 message = get_redirect_message()
             else:
                 exists, full_path = path_exists(path)
@@ -165,8 +157,7 @@ while True:
                     message = get_message(full_path, is_ico_jpg, closed)
             conn.send(message) 
     except Exception as e:
-        message = get_closed_message()
-        conn.send(message) 
+        print(e)
         conn.close()
 
 
