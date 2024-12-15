@@ -81,7 +81,6 @@ def get_message(full_path, is_ico_jpg, closed):
                 content = content.encode()
             return message.encode() + content
     except Exception as e:
-        print(e)
         return get_not_exist_message()
 
 def get_redirect_message():
@@ -120,8 +119,7 @@ def is_closed(lines):
 
 TCP_IP = '0.0.0.0'
 try:
-    # TCP_PORT = int(sys.argv[1])
-    TCP_PORT = 12342
+    TCP_PORT = int(sys.argv[1])
     if TCP_PORT < 1024 or TCP_PORT > 65535:
         raise ValueError("Port must be between 1024 and 65535")
 except ValueError as e:
@@ -138,12 +136,11 @@ while True:
     try:
         while True:
             data = get_all_data(conn)	
-            # print(data)
+            print(data)
             if not data or len(data.strip()) == 0:
                 conn.close()
                 break
             path, lines, is_ico_jpg = parse_request(data)
-            print("path:", path)
             closed = is_closed(lines)
             if path == "/":
                 path = "/index.html"
@@ -157,7 +154,6 @@ while True:
                     message = get_message(full_path, is_ico_jpg, closed)
             conn.send(message) 
     except Exception as e:
-        print(e)
         conn.close()
 
 
