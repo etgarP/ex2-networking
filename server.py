@@ -150,7 +150,7 @@ while True:
             if not data:
                 conn.close()
                 break
-            path, lines, is_ico_jpg = parse_request()
+            path, lines, is_ico_jpg = parse_request(data)
             closed = is_closed(lines)
             if path == "/":
                 message = get_index_message(closed)
