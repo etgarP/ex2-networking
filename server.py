@@ -7,7 +7,7 @@ def get_all_data(con):
         input: 
             con: connection
         output:
-            all the data in a variable
+            the recieved data
     """
     data = ""
     data = con.recv(BUFFER_SIZE)
@@ -29,12 +29,12 @@ def parse_request(data):
     headers = lines[1:]
 
     headers_dict = {}
-    for header in headers:
+    for header in headers: # Splitting by :
         if header:
             key, value = header.split(":", 1)
             headers_dict[key.strip()] = value.strip()
     _, extension = os.path.splitext(path)
-    is_ico_jpg = extension.lower() in ['.ico', '.jpg']
+    is_ico_jpg = extension.lower() in ['.ico', '.jpg'] # checking its a path of .ico or .jpg
     return path, headers_dict, is_ico_jpg
 
 def path_exists(relative_path):
@@ -70,7 +70,7 @@ def get_message(full_path, is_ico_jpg, closed):
             connection_status = "closed"
         else:
             connection_status = "keep alive"
-        mode = "rb" if is_ico_jpg else "r"
+        mode = "rb" if is_ico_jpg else "r" # if its ico or jpg reding bytes else reading as is
         with open(full_path, mode) as f:
             content = f.read()
             message = f"HTTP/1.1 200 OK\r\n"
@@ -118,7 +118,7 @@ def is_closed(lines):
     return lines.get("connection", "").lower() == "close"
 
 TCP_IP = '0.0.0.0'
-try:
+try: # checking correct input
     TCP_PORT = int(sys.argv[1])
     if TCP_PORT < 1024 or TCP_PORT > 65535:
         raise ValueError("Port must be between 1024 and 65535")
@@ -135,24 +135,24 @@ while True:
     conn.settimeout(1.0)
     try:
         while True:
-            data = get_all_data(conn)	
+            data = get_all_data(conn) # getting data
             print(data)
             if not data or len(data.strip()) == 0:
                 conn.close()
                 break
-            path, lines, is_ico_jpg = parse_request(data)
+            path, lines, is_ico_jpg = parse_request(data) # parsing request
             closed = is_closed(lines)
-            if path == "/":
+            if path == "/": # if path is / changing it to /index
                 path = "/index.html"
-            if path == '/redirect':
+            if path == '/redirect': # handeling /redirect
                 message = get_redirect_message()
             else:
-                exists, full_path = path_exists(path)
+                exists, full_path = path_exists(path) # checkingif path exist
                 if not exists:
                     message = get_not_exist_message()
                 else:
-                    message = get_message(full_path, is_ico_jpg, closed)
-            conn.send(message) 
+                    message = get_message(full_path, is_ico_jpg, closed) # getting return message if path exists
+            conn.send(message) # sending
     except Exception as e:
         conn.close()
 
