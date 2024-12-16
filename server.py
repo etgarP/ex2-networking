@@ -147,7 +147,7 @@ while True:
             if path == '/redirect': # handeling /redirect
                 message = get_redirect_message()
             else:
-                exists, full_path = path_exists(path) # checkingif path exist
+                exists, full_path = path_exists(path) # checking if path exist
                 if not exists:
                     message = get_not_exist_message()
                 else:
