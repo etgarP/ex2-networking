@@ -135,6 +135,7 @@ while True:
     conn.settimeout(1.0)
     try:
         while True:
+            toClose = False
             data = get_all_data(conn) # getting data
             print(data)
             if not data or len(data.strip()) == 0:
@@ -146,13 +147,17 @@ while True:
                 path = "/index.html"
             if path == '/redirect': # handeling /redirect
                 message = get_redirect_message()
+                toClose = True
             else:
                 exists, full_path = path_exists(path) # checking if path exist
                 if not exists:
+                    toClose = True
                     message = get_not_exist_message()
                 else:
                     message = get_message(full_path, is_ico_jpg, closed) # getting return message if path exists
             conn.send(message) # sending
+            if (toClose):
+                conn.close()
     except Exception as e:
         conn.close()
 
