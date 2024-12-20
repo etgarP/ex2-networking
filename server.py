@@ -45,7 +45,7 @@ def path_exists(relative_path):
             if relative path is null or doesn't exist returns false 
                 else return true
     """
-    if not relative_path:
+    if not relative_path or not relative_path.startswith('/'):
         return False, None
 
     # Normalize relative path
