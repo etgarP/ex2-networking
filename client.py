@@ -18,7 +18,7 @@ def main():
 	while True:
 		# If it's in redirect we don't want to get input
 		if (not try_again):
-			filePath = input()
+			filePath = input().replace(" ", "")
 		try_again = False
 		fileName = get_file_name(filePath)
 		# If the connection is closed we restart it
