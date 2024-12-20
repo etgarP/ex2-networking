@@ -133,11 +133,16 @@ s.listen(1)
 while True:
     conn, addr = s.accept()
     conn.settimeout(1.0)
+    toClose = False
     try:
         while True:
+            if toClose:
+                conn.close()
+                conn, addr = s.accept()
             toClose = False
             data = get_all_data(conn) # getting data
-            print(data)
+            if (data and data[0] == 'G'):
+                print(data)
             if not data or len(data.strip()) == 0:
                 conn.close()
                 break
@@ -156,7 +161,5 @@ while True:
                 else:
                     message = get_message(full_path, is_ico_jpg, closed) # getting return message if path exists
             conn.send(message) # sending
-            if (toClose):
-                conn.close()
     except Exception as e:
         conn.close()

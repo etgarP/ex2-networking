@@ -1,155 +1,162 @@
+import os 
+import sys 
 import socket
-import sys
-import os
-
-BUFFER_SIZE = 1024
-OK = 200
-REDIRECT = 301
-NOT_FOUND = 404
-
-def main():
-	serverIp = sys.argv[1] 
-	serverPort = int(sys.argv[2])
-	# Creating socket
-	s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-	try_again = False
-	closed_connection = True
-
-	while True:
-		# If it's in redirect we don't want to get input
-		if (not try_again):
-			filePath = input()
-		try_again = False
-		fileName = get_file_name(filePath)
-		if fileName.strip() == "":
-			continue
-		# If the connection is closed we restart it
-		if (closed_connection):
-			s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-			s.connect((serverIp,serverPort))
-			closed_connection = False
-		request = construct_msg(filePath, try_again)
-		s.send(request.encode())
-		# Getting reply from the server
-		serverReply = get_all_data(s)
-		if (not serverReply):
-			closed_connection = True
-			try_again = True
-			s.close()
-			continue
-		# Getting the first line
-		status, firstLine, fileContent, linesDict = parse_response(serverReply)
-		print(firstLine.decode())
-		if(status == OK):
-			create_the_file(fileContent, fileName)
-			if (connection_closed(linesDict)):
-				s.close()
-			closed_connection = True
-			continue
-		elif(status == REDIRECT):
-			filePath = get_location(linesDict)
-			try_again = True
-		closed_connection = True
-
-
-def get_file_name(filePath):
-	return "index.html" if filePath == "/" else os.path.basename(filePath)
-
-def get_leftover(newData):
-	status, firstLine, fileContent, linesDict = parse_response(newData)
-	if "Content-Length" in linesDict:
-		length = int(linesDict["Content-Length"])
-		fileLength = len(fileContent)
-		return length - fileLength
-	return 0
 
 def get_all_data(con):
-	data = b""
-	start = True
-	leftover = 5000
-	while leftover:
-		# Adding up the data
-		newData = con.recv(BUFFER_SIZE)
-		if start:
-			leftover = get_leftover(newData)
-			start = False
-		else:
-			leftover -= len(newData)
-		if not newData: 
-			break
-		data += newData
-	if (data == b""):
-		return None
-	return data
+    """
+        input: 
+            con: connection
+        output:
+            the recieved data
+    """
+    data = ""
+    data = con.recv(BUFFER_SIZE)
+    return data.decode()
 
-def get_content(data):
-	delimiter = b"\r\n\r\n"
-	# Finding the separation in the server's message
-	index = data.find(delimiter)
-	return data[index + len(delimiter):]
-    
-def create_the_file(fileContent, fileName):
-	# Getting the directory that this file is in
-	current_directory = os.path.dirname(os.path.abspath(__file__))
-	# Creating the path to the new file
-	file_path = os.path.join(current_directory, fileName)
-	# If the file is an image, write in bytes
-	if fileName.endswith(('.ico', '.jpg')):
-		with open(file_path, "wb") as file:
-			file.write(fileContent)
-		file.close()
-	else:
-		fileContent = fileContent.decode()	
-		# Writing the content to the file
-		with open(file_path, "w") as file:
-			file.write(fileContent)
-		file.close()
-	
+def parse_request(data):
+    """
+        input: 
+	        data
+        output:
+            path, lines in a map in format (name: value), if its a .ico or .jpg
+    """
+    # separating the data into lines
+    lines = data.splitlines()
 
+    # First line is the GET request. the path is in the middle
+    request_line = lines[0]
+    _, path, _ = request_line.split(" ")
+    headers = lines[1:]
 
-def get_first_line(serverReply):
-	response = serverReply
-	lines = response.splitlines()
-	return lines[0]
+    headers_dict = {}
+    for header in headers: # Splitting by :
+        if header:
+            key, value = header.split(":", 1)
+            headers_dict[key.strip()] = value.strip()
+    _, extension = os.path.splitext(path)
+    is_ico_jpg = extension.lower() in ['.ico', '.jpg'] # checking its a path of .ico or .jpg
+    return path, headers_dict, is_ico_jpg
 
+def path_exists(relative_path):
+    """
+        input: 
+            relative path
+        output:
+            if relative path is null or doesn't exist returns false 
+                else return true
+    """
+    if not relative_path:
+        return False, None
 
-def get_location(lines):
-    return lines.get("Location", "")
+    # Normalize relative path
+    base_path = os.path.join(os.path.dirname(__file__), "files")
+    relative_path = os.path.join(base_path, relative_path.lstrip('/'))
 
-def construct_msg(path, redirectFlag):
-	if (not redirectFlag):
-		return 	(f"GET {path} HTTP/1.1\r\n"
-				f"Connection: keep-alive\r\n"
-				f"\r\n")
-	return 	(f"GET {path} HTTP/1.1\r\n"
-			f"Connection: close\r\n"
-			f"\r\n")
+    # Check if path exists
+    if os.path.exists(relative_path):
+        return True, relative_path
+    return False, None
 
+def get_message(full_path, is_ico_jpg, closed):
+    """
+        input: 
+            path, is_ico_jpg, closed
+        output:
+            needed message to send to client
+    """
+    try:
+        # Open in binary mode for `.jpg` or `.ico`, text mode otherwise
+        if closed:
+            connection_status = "closed"
+        else:
+            connection_status = "keep alive"
+        mode = "rb" if is_ico_jpg else "r" # if its ico or jpg reding bytes else reading as is
+        with open(full_path, mode) as f:
+            content = f.read()
+            message = f"HTTP/1.1 200 OK\r\n"
+            message += f"Connection: {connection_status}\r\n"
+            message += f"Content-Length: {len(content)}\r\n"
+            message += "\r\n"
+            if (mode == "r"):
+                content = content.encode()
+            return message.encode() + content
+    except Exception as e:
+        return get_not_exist_message()
 
-def parse_response(serverReply):
-	firstLine = get_first_line(serverReply)
-	statusCode = int(firstLine.decode().split(" ")[1])
-	if (statusCode == OK):
-		file = get_content(serverReply)
-	else:
-		file = None	
-	# separating the reply into lines
-	delimiter = b"\r\n\r\n"
-	index = serverReply.find(delimiter)
-	headers_section = serverReply[:index].decode()
-	lines = headers_section.splitlines()
-	headers = lines[1:]
-	headers_dict = {}
-	for header in headers:
-		if header:
-			key, value = header.split(":", 1)
-			headers_dict[key.strip()] = value.strip()
+def get_redirect_message():
+    """
+        input: 
+            nothing
+        output:
+            the not exist message
+    """
+    message = "HTTP/1.1 301 Moved Permanently\r\n"
+    message += "Connection: close\r\n"
+    message += "Location: /result.html\r\n"
+    message += "\r\n"
+    return message.encode()
 
-	return statusCode, firstLine, file, headers_dict
+def get_not_exist_message():
+    """
+        input: 
+            nothing
+        output:
+            the not exist message
+    """
+    message = "HTTP/1.1 404 Not Found\r\n"
+    message += "Connection: close\r\n"
+    message += "\r\n"
+    return message.encode()
 
-def connection_closed(linesDict):
-	return linesDict.get("connection", "").lower() == "close"
+def is_closed(lines):
+    """
+        input: 
+            lines
+        output:
+            if the connection is closed
+    """
+    return lines.get("connection", "").lower() == "close"
 
+TCP_IP = '0.0.0.0'
+try: # checking correct input
+    TCP_PORT = int(sys.argv[1])
+    if TCP_PORT < 1024 or TCP_PORT > 65535:
+        raise ValueError("Port must be between 1024 and 65535")
+except ValueError as e:
+    print(f"Invalid port: {e}")
+    sys.exit(1)
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind((TCP_IP, TCP_PORT))
+BUFFER_SIZE = 1024
+s.listen(1)
 
-if __name__ == "__main__":
-    main()
+while True:
+    conn, addr = s.accept()
+    conn.settimeout(1.0)
+    try:
+        while True:
+            toClose = False
+            data = get_all_data(conn) # getting data
+            print(data)
+            if not data or len(data.strip()) == 0:
+                conn.close()
+                break
+            path, lines, is_ico_jpg = parse_request(data) # parsing request
+            closed = is_closed(lines)
+            if path == "/": # if path is / changing it to /index
+                path = "/index.html"
+            if path == '/redirect': # handeling /redirect
+                message = get_redirect_message()
+                toClose = True
+            else:
+                exists, full_path = path_exists(path) # checking if path exist
+                if not exists:
+                    toClose = True
+                    message = get_not_exist_message()
+                else:
+                    message = get_message(full_path, is_ico_jpg, closed) # getting return message if path exists
+            conn.send(message) # sending
+            if (toClose):
+                conn.close()
+    except Exception as e:
+        conn.close()
