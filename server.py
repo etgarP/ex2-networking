@@ -160,5 +160,3 @@ while True:
                 conn.close()
     except Exception as e:
         conn.close()
-
-
