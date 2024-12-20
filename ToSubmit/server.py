@@ -45,7 +45,7 @@ def path_exists(relative_path):
             if relative path is null or doesn't exist returns false 
                 else return true
     """
-    if not relative_path:
+    if not relative_path or not relative_path.startswith('/'):
         return False, None
 
     # Normalize relative path
@@ -133,10 +133,16 @@ s.listen(1)
 while True:
     conn, addr = s.accept()
     conn.settimeout(1.0)
+    toClose = False
     try:
         while True:
+            if toClose:
+                conn.close()
+                conn, addr = s.accept()
+            toClose = False
             data = get_all_data(conn) # getting data
-            print(data)
+            if (data and data[0] == 'G'):
+                print(data)
             if not data or len(data.strip()) == 0:
                 conn.close()
                 break
@@ -146,14 +152,14 @@ while True:
                 path = "/index.html"
             if path == '/redirect': # handeling /redirect
                 message = get_redirect_message()
+                toClose = True
             else:
                 exists, full_path = path_exists(path) # checking if path exist
                 if not exists:
+                    toClose = True
                     message = get_not_exist_message()
                 else:
                     message = get_message(full_path, is_ico_jpg, closed) # getting return message if path exists
             conn.send(message) # sending
     except Exception as e:
         conn.close()
-
-

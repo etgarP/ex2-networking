@@ -23,6 +23,7 @@ def main():
 		fileName = get_file_name(filePath)
 		# If the connection is closed we restart it
 		if (closed_connection):
+			s.close()
 			s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 			s.connect((serverIp,serverPort))
 			closed_connection = False
@@ -33,32 +34,44 @@ def main():
 		if (not serverReply):
 			closed_connection = True
 			try_again = True
-			s.close()
 			continue
 		# Getting the first line
 		status, firstLine, fileContent, linesDict = parse_response(serverReply)
-		print(firstLine)
+		print(firstLine.decode())
 		if(status == OK):
 			create_the_file(fileContent, fileName)
 			if (connection_closed(linesDict)):
 				closed_connection = True
-				s.close()
 			continue
 		elif(status == REDIRECT):
 			filePath = get_location(linesDict)
 			try_again = True
 		closed_connection = True
-		s.close()
 
 
 def get_file_name(filePath):
 	return "index.html" if filePath == "/" else os.path.basename(filePath)
 
+def get_leftover(newData):
+	status, firstLine, fileContent, linesDict = parse_response(newData)
+	if "Content-Length" in linesDict:
+		length = int(linesDict["Content-Length"])
+		fileLength = len(fileContent)
+		return length - fileLength
+	return 0
+
 def get_all_data(con):
 	data = b""
-	while True:
+	start = True
+	leftover = 5000
+	while leftover:
 		# Adding up the data
 		newData = con.recv(BUFFER_SIZE)
+		if start and newData:
+			leftover = get_leftover(newData)
+			start = False
+		else:
+			leftover -= len(newData)
 		if not newData: 
 			break
 		data += newData
